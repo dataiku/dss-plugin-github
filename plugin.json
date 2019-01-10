@@ -1,6 +1,6 @@
 {
     "id" : "github",
-    "version" : "0.0.3",
+    "version" : "0.0.4",
     "meta" : {
         "label": "Github plugin",
         "description" : "This plugin includes connectors to retrieve data about Github repositories",
