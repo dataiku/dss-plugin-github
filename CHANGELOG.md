@@ -1,3 +1,9 @@
+# 0.0.4 - 2018/01/10
+
+* Switch to using a code env
+
+# 0.0.3 - ?
+
 # 0.0.2 - 2016/04/07
 
 * Add issue body
