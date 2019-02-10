@@ -1,13 +1,13 @@
 {
-    "id" : "github",
-    "version" : "0.0.4",
-    "meta" : {
-        "label": "Github plugin",
-        "description" : "This plugin includes connectors to retrieve data about Github repositories",
-        "author" : "Dataiku",
-        "icon" : "icon-github",
-        "tags" : ["Productivity", "API"],
-        "url" : "https://www.dataiku.com/community/plugins/info/github.html",
+    "id": "github",
+    "version": "0.0.4",
+    "meta": {
+        "label": "Github",
+        "description": "This plugin includes connectors to retrieve data about Github repositories",
+        "author": "Dataiku (Clément Stenac)",
+        "icon": "icon-github",
+        "tags": ["Productivity", "SaaS", "Connector"],
+        "url": "https://www.dataiku.com/dss/plugins/info/github.html",
         "licenseInfo": "Apache Software License"
     }
 }
