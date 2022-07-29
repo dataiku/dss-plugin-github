@@ -1,27 +1,34 @@
 {
 	"meta" : {
 		"label" : "Github issues",
-		"description" : "Fetches the issues for a single Github repository"
+		"description" : "Fetches the issues for a single Github repository",
+        "icon": "icon-github"
 	},
 	"strictSchema" : true,
 	"params" : [
-		{
-			"name" : "login",
-            "label" : "Login",
-			"type" : "STRING",
-			"mandatory" : true
-		},
-		{
-			"name" : "password",
-            "label" : "Password or Personal Access Token",
-			"type" : "PASSWORD",
-			"mandatory" : true
-		},
+        {
+            "name": "personal_access_token_credentials_preset",
+            "label": "Github Personal Access Token",
+            "description": "For more information on how to create your token: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token",
+            "type":"PRESET",
+            "parameterSetId": "personal-access-token"
+        },
 		{
 			"name" : "repos",
             "label" : "Repository (in the form user/repos)",
 			"type" : "STRING",
 			"mandatory" : true
+		},
+		{
+			"name" : "state",
+            "label" : "State of fetched issues",
+			"type" : "SELECT",
+            "selectChoices": [
+                { "value": "open", "label": "Open"},
+                { "value": "closed", "label": "Closed"},
+                { "value": "all", "label": "All"}
+            ],
+            "defaultValue": "all"
 		},
 		{
 			"name" : "fetch_comments",
