@@ -37,6 +37,7 @@ class GithubSearchPullRequestsConnector(Connector):
         self.state = config["state"]
         self.since_date = config["since_date"]
         self.fetch_requested_reviewers = config["fetch_requested_reviewers"]
+        self.fetch_merge_status = config["fetch_merge_status"]
         self.compute_comment_count = config["compute_comment_count"]
         self.fetched_issues_unique_ids = []
 
@@ -48,31 +49,26 @@ class GithubSearchPullRequestsConnector(Connector):
                       partition_id=None, records_limit=-1):
         remaining_records_to_fetch = records_limit
         query_date = datetime.datetime.now()
-        issues_for_author = []
-        issues_for_reviewer = []
+        fetched_issues = []
 
         if self.link_to_users in ["all", "open_by"]:
-            issues_for_author = \
+            fetched_issues = \
                 self.fetch_issues_for_users("author", records_limit, remaining_records_to_fetch, query_date)
 
-        can_add_new_records = records_limit is -1 or len(issues_for_author) < records_limit
+        can_add_new_records = records_limit is -1 or len(self.fetched_issues_unique_ids) < records_limit
         if can_add_new_records and self.link_to_users in ["all", "reviewed_by"]:
-            issues_for_reviewer = \
+            remaining_records_to_fetch -= len(self.fetched_issues_unique_ids)
+            fetched_issues += \
                 self.fetch_issues_for_users("reviewed-by", records_limit, remaining_records_to_fetch, query_date)
 
-        for issue in issues_for_author + issues_for_reviewer:
+        for issue in fetched_issues:
             yield issue
-            if records_limit is not -1:
-                remaining_records_to_fetch -= 1
-                if remaining_records_to_fetch <=0:
-                    logging.info("Max number of record reached ({}). Stop appending.".format(records_limit))
-                    break
 
     def fetch_issues_for_users(self, link, records_limit, remaining_records_to_fetch, query_date):
         result = []
         for user_handle in self.github_team_handles:
             new_issues = self.fetch_issues_for_link_to_users(
-                query_date, link, user_handle, remaining_records_to_fetch
+                query_date, link, user_handle, remaining_records_to_fetch, records_limit
             )
             result += new_issues
 
@@ -84,12 +80,12 @@ class GithubSearchPullRequestsConnector(Connector):
 
         return result
 
-    def fetch_issues_for_link_to_users(self, query_date, link_to_users, user_handle, remaining_records_to_fetch):
+    def fetch_issues_for_link_to_users(self, query_date, link_to_users, user_handle, remaining_records_to_fetch, records_limit):
         search_query = self.build_search_query(link_to_users, user_handle, self.owner, self.state, self.since_date)
         logging.info("Fetching Issues corresponding to search query '{}' (remaining records to fetch: {})".format(
             search_query, remaining_records_to_fetch
         ))
-        issues = fetch_issues(query_date, self.github_client, search_query, remaining_records_to_fetch,
+        issues = fetch_issues(query_date, self.github_client, search_query, records_limit, self.fetch_merge_status,
                               self.fetch_requested_reviewers, self.compute_comment_count, link_to_users, user_handle,
                               self.fetched_issues_unique_ids)
         return issues
