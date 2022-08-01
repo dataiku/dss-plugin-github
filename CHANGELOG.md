@@ -1,6 +1,6 @@
 # Version 1.0.0 - 2022-07-29
 * Updates
-    * Add Personal access token preset
+    * Replace auth mechanism by a Personal access token preset
     * Python 3 support
     * Add a state selector on the issues connector
 * New components
