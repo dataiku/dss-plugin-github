@@ -60,9 +60,22 @@
 		{
 			"name" : "since_date",
             "label" : "Pull Requests created after",
-			"type" : "DATE",
-            "description": "Keep Pull Requests created after the selected date."
+			"type" : "STRING",
+            "defaultValue": "YYYY-MM-DD",
+            "description": "Keep Pull Requests created after the selected date (YYYY-MM-DD)."
 		},
+		{
+			"name" : "time_consuming_operations",
+            "label" : "Time consuming operations",
+			"type" : "SEPARATOR"
+		},
+        {
+            "name": "fetch_merge_status",
+            "label": "Fetch the merge status",
+            "description": "Will allow to compute whether a Pull Request was merged or simply closed. Makes downloading much slower.",
+            "type":"BOOLEAN",
+            "defaultValue": false
+        },
         {
             "name": "fetch_requested_reviewers",
             "label": "Fetch the requested reviewers",
