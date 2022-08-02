@@ -33,7 +33,7 @@ def fetch_issues(query_date, github_client, search_query, records_limit, fetch_a
     except RateLimitExceededException as rate_limit_exceeded_exception:
         sleep_or_throw_because_of_rate_limit(current_attempt, github_client, rate_limit_exceeded_exception)
         return fetch_issues(query_date, github_client, search_query, records_limit, fetch_additional_costly_fields,
-                            link_to_users, user_handle, unique_issues_ids, ++current_attempt)
+                            link_to_users, user_handle, unique_issues_ids, current_attempt + 1)
 
     return results
 
