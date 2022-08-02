@@ -51,7 +51,7 @@ def sleep_or_throw_because_of_rate_limit(current_attempt, github_client, rate_li
         logging.info("Could not fetch result due to rate limits even after {} attempts.".format(current_attempt))
         raise rate_limit_exceeded_exception
 
-    seconds_before_reset = (search_rate_limit.reset - now).total_seconds() + 1
+    seconds_before_reset = (search_rate_limit.reset - now).total_seconds() + 5
     logging.info("Sleeping {} seconds before next attempt to fetch data.".format(seconds_before_reset))
     time.sleep(seconds_before_reset)
 
