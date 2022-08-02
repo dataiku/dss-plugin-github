@@ -36,9 +36,7 @@ class GithubSearchPullRequestsConnector(Connector):
         self.link_to_users = config["link_to_users"]
         self.state = config["state"]
         self.since_date = config["since_date"]
-        self.fetch_requested_reviewers = config["fetch_requested_reviewers"]
-        self.fetch_merge_status = config["fetch_merge_status"]
-        self.compute_comment_count = config["compute_comment_count"]
+        self.fetch_additional_costly_fields = config["fetch_additional_costly_fields"]
         self.fetched_issues_unique_ids = []
 
     def get_read_schema(self):
@@ -85,7 +83,7 @@ class GithubSearchPullRequestsConnector(Connector):
         logging.info("Fetching Issues corresponding to search query '{}' (remaining records to fetch: {})".format(
             search_query, remaining_records_to_fetch
         ))
-        issues = fetch_issues(query_date, self.github_client, search_query, records_limit, self.fetch_merge_status,
-                              self.fetch_requested_reviewers, self.compute_comment_count, link_to_users, user_handle,
+        issues = fetch_issues(query_date, self.github_client, search_query, records_limit,
+                              self.fetch_additional_costly_fields, link_to_users, user_handle,
                               self.fetched_issues_unique_ids)
         return issues

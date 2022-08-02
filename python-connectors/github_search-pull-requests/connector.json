@@ -66,30 +66,15 @@
 		},
 		{
 			"name" : "time_consuming_operations",
-            "label" : "Time consuming operations",
+            "label" : "Time consuming operations (Makes downloading much slower)",
 			"type" : "SEPARATOR"
 		},
         {
-            "name": "fetch_merge_status",
-            "label": "Fetch the merge status",
-            "description": "Will allow to compute whether a Pull Request was merged or simply closed. Makes downloading much slower.",
+            "name": "fetch_additional_costly_fields",
+            "label": "Fetch additional fields",
+            "description": "Add merged status, requested_reviewers and count of comments.",
             "type":"BOOLEAN",
             "defaultValue": false
-        },
-        {
-            "name": "fetch_requested_reviewers",
-            "label": "Fetch the requested reviewers",
-            "description": "Makes downloading much slower.",
-            "type":"BOOLEAN",
-            "defaultValue": false
-        },
-        {
-            "name": "compute_comment_count",
-            "label": "Compute comment count",
-            "description": "Makes downloading much slower.",
-            "type":"BOOLEAN",
-            "defaultValue": false,
-            "visibilityCondition": "model.fetch_requested_reviewers"
         }
     ]
 }

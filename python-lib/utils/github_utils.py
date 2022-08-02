@@ -5,7 +5,6 @@ import time
 from datetime import datetime
 
 MAX_NUMBER_OF_FETCH_ATTEMPT_TO_BYPASS_RATE_LIMIT = 2
-COLUMNS_TO_KEEP = ["title", "html_url", "id", "number", "state", "created_at", "labels", "milestone", "pull_request"]
 
 
 def get_github_client(config, preset_id="personal_access_token_credentials_preset"):
@@ -13,9 +12,8 @@ def get_github_client(config, preset_id="personal_access_token_credentials_prese
     return github.Github(login_or_token=access_token)
 
 
-def fetch_issues(query_date, github_client, search_query, records_limit, fetch_merge_status=False, 
-                 fetch_requested_reviewers=False, compute_comment_count=False, link_to_users=None, 
-                 user_handle=None, unique_issues_ids=[], current_attempt=1):
+def fetch_issues(query_date, github_client, search_query, records_limit, fetch_additional_costly_fields=False,
+                 link_to_users=None, user_handle=None, unique_issues_ids=[], current_attempt=1):
     current_number_of_fetched_issues = len(unique_issues_ids)
     results = []
     try:
@@ -29,15 +27,13 @@ def fetch_issues(query_date, github_client, search_query, records_limit, fetch_m
             issue_already_processed = _handle_user_link(new_record, user_handle, link_to_users, unique_issues_ids)
             if issue_already_processed:
                 continue
-            _handle_costly_fields(fetch_merge_status, compute_comment_count, 
-                                  fetch_requested_reviewers, issue, new_record)
+            _handle_costly_fields(fetch_additional_costly_fields, issue, new_record)
             results.append(new_record)
             current_number_of_fetched_issues += 1
     except RateLimitExceededException as rate_limit_exceeded_exception:
         sleep_or_throw_because_of_rate_limit(current_attempt, github_client, rate_limit_exceeded_exception)
-        return fetch_issues(query_date, github_client, search_query, records_limit, fetch_merge_status,
-                            fetch_requested_reviewers, compute_comment_count, link_to_users, user_handle,
-                            unique_issues_ids, ++current_attempt)
+        return fetch_issues(query_date, github_client, search_query, records_limit, fetch_additional_costly_fields,
+                            link_to_users, user_handle, unique_issues_ids, ++current_attempt)
 
     return results
 
@@ -60,18 +56,12 @@ def sleep_or_throw_because_of_rate_limit(current_attempt, github_client, rate_li
     time.sleep(seconds_before_reset)
 
 
-def _handle_costly_fields(fetch_merge_status, compute_comment_count, fetch_requested_reviewers, issue_handle, new_record):
-    if not (fetch_requested_reviewers or fetch_merge_status):
+def _handle_costly_fields(fetch_additional_costly_fields, issue_handle, new_record):
+    if not fetch_additional_costly_fields:
         return
-    pull_request_handle = issue_handle.as_pull_request()
-    if fetch_merge_status:
-        new_record["merged"] = pull_request_handle.merged
-    if fetch_requested_reviewers:
-        # Tuple where user is first
-        new_record["requested_reviewers"] = \
-            [{"name": user.name, "login": user.login} for user in pull_request_handle.get_review_requests()[0]]
-        if compute_comment_count:
-            new_record["comments"] = pull_request_handle.comments + pull_request_handle.review_comments
+    pull_request = issue_handle.as_pull_request()._rawData
+    _enrich_with_column_values(pull_request, new_record, ["merged", "requested_reviewers"])
+    new_record["comments"] = pull_request["comments"] + pull_request["review_comments"]
 
 
 def _handle_user_link(new_record, user_handle, link_to_user, unique_issues_ids):
@@ -111,7 +101,14 @@ def _to_rate_limit_dict(rate_limit):
 def _build_base_issue_record(raw_issue, query_date):
     issue_raw_data = raw_issue._rawData
     result = {"query_date": query_date}
-    for column_to_keep in COLUMNS_TO_KEEP:
-        result[column_to_keep] = issue_raw_data[column_to_keep]
+    _enrich_with_column_values(
+        issue_raw_data, result,
+        ["title", "html_url", "id", "number", "state", "created_at", "labels", "milestone", "pull_request"]
+    )
     result["author"] = _parse_user(issue_raw_data["user"])
     return result
+
+
+def _enrich_with_column_values(record_raw_data, record_to_enrich, column_names):
+    for column_name in column_names:
+        record_to_enrich[column_name] = record_raw_data[column_name]
