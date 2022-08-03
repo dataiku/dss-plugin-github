@@ -75,6 +75,21 @@
             "description": "Add merged status, requested_reviewers and count of comments.",
             "type":"BOOLEAN",
             "defaultValue": false
+        },
+        {
+            "name": "enable_auto_retry",
+            "label": "Enable auto retry mechanism",
+            "description": "When enabled, will fetch again data after a failure due to hitting the rate limit.",
+            "type":"BOOLEAN",
+            "defaultValue": true
+        },
+        {
+            "name": "number_of_fetch_retry",
+            "label": "Number of retries:",
+            "description": "Allow to retry after hitting the rate limit. -1 for no retry limit, 0 to disable.",
+            "type":"INT",
+            "defaultValue": -1,
+            "visibilityCondition": "model.enable_auto_retry"
         }
     ]
 }

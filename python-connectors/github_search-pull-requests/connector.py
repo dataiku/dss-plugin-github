@@ -37,14 +37,15 @@ class GithubSearchPullRequestsConnector(Connector):
         self.state = config["state"]
         self.since_date = config["since_date"]
         self.fetch_additional_costly_fields = config["fetch_additional_costly_fields"]
+        self.enable_auto_retry = config["enable_auto_retry"]
+        self.number_of_fetch_retry = config["number_of_fetch_retry"]
         self.fetched_issues_unique_ids = []
 
     def get_read_schema(self):
         # Let DSS infer the schema from the columns returned by the generate_rows method
         return None
 
-    def generate_rows(self, dataset_schema=None, dataset_partitioning=None,
-                      partition_id=None, records_limit=-1):
+    def generate_rows(self, dataset_schema=None, dataset_partitioning=None, partition_id=None, records_limit=-1):
         remaining_records_to_fetch = records_limit
         query_date = datetime.datetime.now()
         fetched_issues = []
@@ -55,7 +56,8 @@ class GithubSearchPullRequestsConnector(Connector):
 
         can_add_new_records = records_limit is -1 or len(self.fetched_issues_unique_ids) < records_limit
         if can_add_new_records and self.link_to_users in ["all", "reviewed_by"]:
-            remaining_records_to_fetch -= len(self.fetched_issues_unique_ids)
+            if records_limit is not -1:
+                remaining_records_to_fetch -= len(self.fetched_issues_unique_ids)
             fetched_issues += \
                 self.fetch_issues_for_users("reviewed-by", records_limit, remaining_records_to_fetch, query_date)
 
@@ -80,10 +82,13 @@ class GithubSearchPullRequestsConnector(Connector):
 
     def fetch_issues_for_link_to_users(self, query_date, link_to_users, user_handle, remaining_records_to_fetch, records_limit):
         search_query = self.build_search_query(link_to_users, user_handle, self.owner, self.state, self.since_date)
-        logging.info("Fetching Issues corresponding to search query '{}' (remaining records to fetch: {})".format(
-            search_query, remaining_records_to_fetch
-        ))
+        logging.info(
+            "Fetching Issues corresponding to search query '{}' (remaining records to fetch: {}, already fetched items: {})".format(
+                search_query, remaining_records_to_fetch, len(self.fetched_issues_unique_ids)
+            )
+        )
         issues = fetch_issues(query_date, self.github_client, search_query, records_limit,
+                              self.enable_auto_retry, self.number_of_fetch_retry,
                               self.fetch_additional_costly_fields, link_to_users, user_handle,
                               self.fetched_issues_unique_ids)
         return issues

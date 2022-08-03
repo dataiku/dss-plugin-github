@@ -12,12 +12,18 @@ def get_github_client(config, preset_id="personal_access_token_credentials_prese
     return github.Github(login_or_token=access_token)
 
 
-def fetch_issues(query_date, github_client, search_query, records_limit, fetch_additional_costly_fields=False,
+def fetch_issues(query_date, github_client, search_query, records_limit,
+                 enable_auto_retry=False, number_of_fetch_retry=0,
+                 fetch_additional_costly_fields=False,
                  link_to_users=None, user_handle=None, unique_issues_ids=[], current_attempt=1):
     current_number_of_fetched_issues = len(unique_issues_ids)
     results = []
     try:
-        logging.info("Fetching Issues corresponding to search query '{}'".format(search_query))
+        logging.info(
+            "Fetching Issues corresponding to search query '{}' {}".format(
+                search_query,
+                _build_retry_log(current_attempt, enable_auto_retry, number_of_fetch_retry))
+        )
         searched_issues = github_client.search_issues(query=search_query)
         for issue in searched_issues:
             if records_limit is not -1 and 0 <= records_limit <= current_number_of_fetched_issues:
@@ -31,29 +37,40 @@ def fetch_issues(query_date, github_client, search_query, records_limit, fetch_a
             results.append(new_record)
             current_number_of_fetched_issues += 1
     except RateLimitExceededException as rate_limit_exceeded_exception:
-        sleep_or_throw_because_of_rate_limit(current_attempt, github_client, rate_limit_exceeded_exception)
-        return fetch_issues(query_date, github_client, search_query, records_limit, fetch_additional_costly_fields,
+        sleep_or_throw_because_of_rate_limit(
+            enable_auto_retry, number_of_fetch_retry, current_attempt, github_client, rate_limit_exceeded_exception
+        )
+        return fetch_issues(query_date, github_client, search_query, records_limit,
+                            enable_auto_retry, number_of_fetch_retry,
+                            fetch_additional_costly_fields,
                             link_to_users, user_handle, unique_issues_ids, current_attempt + 1)
 
     return results
 
 
-def sleep_or_throw_because_of_rate_limit(current_attempt, github_client, rate_limit_exceeded_exception):
+def sleep_or_throw_because_of_rate_limit(enable_auto_retry, number_of_fetch_retry, current_attempt, github_client,
+                                         rate_limit_exceeded_exception):
     logging.error(rate_limit_exceeded_exception)
     now = datetime.utcnow()
     search_rate_limit = github_client.get_rate_limit().search
-    logging.info("Data only partially fetched for attempt {}. Rate limits: {}. Current time: {}".format(
-        current_attempt,
-        _to_rate_limit_dict(search_rate_limit),
-        now
+    retry_log = _build_retry_log(current_attempt, enable_auto_retry, number_of_fetch_retry)
+    logging.info("Data only partially fetched. Rate limits: {}. Current time: {} {}".format(
+        _to_rate_limit_dict(search_rate_limit), now, retry_log
     ))
-    if current_attempt >= MAX_NUMBER_OF_FETCH_ATTEMPT_TO_BYPASS_RATE_LIMIT:
-        logging.info("Could not fetch result due to rate limits even after {} attempts.".format(current_attempt))
+    infinite_retry = enable_auto_retry and number_of_fetch_retry is -1
+    disable_auto_retry = not enable_auto_retry or number_of_fetch_retry is 0
+    if disable_auto_retry or (not infinite_retry and current_attempt >= number_of_fetch_retry):
+        logging.info("Could not fetch result due to rate limits even after {}.".format(retry_log))
         raise rate_limit_exceeded_exception
 
     seconds_before_reset = (search_rate_limit.reset - now).total_seconds() + 5
     logging.info("Sleeping {} seconds before next attempt to fetch data.".format(seconds_before_reset))
     time.sleep(seconds_before_reset)
+
+
+def _build_retry_log(attempt_number, retry_boolean, max_retry):
+    return "(attempt {attempt_number}, auto retry {retry_boolean}, max number of retry {max_retry})".format(
+        attempt_number=attempt_number, retry_boolean=retry_boolean, max_retry=max_retry)
 
 
 def _handle_costly_fields(fetch_additional_costly_fields, issue_handle, new_record):
