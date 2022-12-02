@@ -120,7 +120,7 @@ def _build_base_issue_record(raw_issue, query_date):
     result = {"query_date": query_date}
     _enrich_with_column_values(
         issue_raw_data, result,
-        ["title", "html_url", "id", "number", "state", "created_at", "labels", "milestone", "pull_request"]
+        ["title", "html_url", "id", "number", "state", "created_at", "closed_at", "labels", "milestone", "pull_request"]
     )
     result["author"] = _parse_user(issue_raw_data["user"])
     return result
