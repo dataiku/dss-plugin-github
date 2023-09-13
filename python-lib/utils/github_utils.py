@@ -1,5 +1,5 @@
 import github
-from github import RateLimitExceededException
+from github import RateLimitExceededException, GithubException
 import logging
 import time
 from datetime import datetime
@@ -36,7 +36,11 @@ def fetch_issues(query_date, github_client, search_query, records_limit,
             _handle_costly_fields(fetch_additional_costly_fields, issue, new_record)
             results.append(new_record)
             current_number_of_fetched_issues += 1
-    except RateLimitExceededException as rate_limit_exceeded_exception:
+    except (GithubException, RateLimitExceededException) as rate_limit_exceeded_exception:
+        if isinstance(rate_limit_exceeded_exception, GithubException) and not \
+                        (rate_limit_exceeded_exception.status == 403 and
+                         "rate limit" in rate_limit_exceeded_exception.data.get('message', '')):
+            _raise_unexpected_exception(rate_limit_exceeded_exception)
         sleep_or_throw_because_of_rate_limit(
             enable_auto_retry, number_of_fetch_retry, current_attempt, github_client, rate_limit_exceeded_exception
         )
@@ -44,7 +48,8 @@ def fetch_issues(query_date, github_client, search_query, records_limit,
                             enable_auto_retry, number_of_fetch_retry,
                             fetch_additional_costly_fields,
                             link_to_users, user_handle, unique_issues_ids, current_attempt + 1)
-
+    except Exception as err:
+        _raise_unexpected_exception(err)
     return results
 
 
@@ -129,3 +134,8 @@ def _build_base_issue_record(raw_issue, query_date):
 def _enrich_with_column_values(record_raw_data, record_to_enrich, column_names):
     for column_name in column_names:
         record_to_enrich[column_name] = record_raw_data[column_name]
+
+
+def _raise_unexpected_exception(unexpected_exception):
+    logging.error("An unexpected exception occurred while fetching issues: %s", unexpected_exception)
+    raise unexpected_exception
