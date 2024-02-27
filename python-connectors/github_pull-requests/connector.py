@@ -34,7 +34,7 @@ class GithubPullRequestsConnector(Connector):
 
         current_number_of_fetched_prs = 0
         columns_to_keep = ["title", "html_url", "id", "number", "state", "created_at", "labels", "user", "milestone",
-                           "requested_reviewers"]
+                           "requested_reviewers", "requested_teams", "draft"]
         for pr_repository_full_name in self.pr_repository_full_names:
 
             pull_requests_for_repository = self.fetch_pull_requests(pr_repository_full_name)

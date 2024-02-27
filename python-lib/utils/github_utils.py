@@ -82,7 +82,7 @@ def _handle_costly_fields(fetch_additional_costly_fields, issue_handle, new_reco
     if not fetch_additional_costly_fields:
         return
     pull_request = issue_handle.as_pull_request()._rawData
-    _enrich_with_column_values(pull_request, new_record, ["merged", "requested_reviewers"])
+    _enrich_with_column_values(pull_request, new_record, ["merged", "requested_reviewers", "requested_teams"])
     new_record["comments"] = pull_request["comments"] + pull_request["review_comments"]
 
 
@@ -125,7 +125,8 @@ def _build_base_issue_record(raw_issue, query_date):
     result = {"query_date": query_date}
     _enrich_with_column_values(
         issue_raw_data, result,
-        ["title", "html_url", "id", "number", "state", "created_at", "closed_at", "labels", "milestone", "pull_request"]
+        ["title", "html_url", "id", "number", "state", "created_at", "closed_at", "labels", "milestone",
+         "pull_request", "draft"]
     )
     result["author"] = _parse_user(issue_raw_data["user"])
     return result
