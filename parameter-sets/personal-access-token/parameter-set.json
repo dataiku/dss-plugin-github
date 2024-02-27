@@ -1,0 +1,20 @@
+{
+    "meta" : {
+        "label": "Personal access token Parameter Set",
+        "description": "",
+        "icon": "icon-github-sign"
+    },
+    "defaultDefinableInline": false,
+    "defaultDefinableAtProjectLevel": false,
+    "pluginParams": [],
+    "params": [
+        {
+            "name": "personal_access_token_credentials_parameter_set",
+            "type": "CREDENTIAL_REQUEST",
+            "label": "NA",
+            "credentialRequestSettings": {
+                "type": "SINGLE_FIELD"
+            }
+        }
+    ]
+}
