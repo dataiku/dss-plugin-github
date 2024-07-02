@@ -20,7 +20,7 @@ COLUMNS= [
 
 class GithubIssuesConnector(Connector):
     def __init__(self, config, plugin_config):
-        Connector.__init__(self, config, plugin_config)
+        super().__init__(config, plugin_config)
         access_token = config["personal_access_token_credentials_preset"]["personal_access_token_credentials_parameter_set"]
         gh = get_github_client(config)
         self.repos = gh.get_repo(config["repos"])

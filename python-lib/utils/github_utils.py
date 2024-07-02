@@ -82,7 +82,7 @@ def _handle_costly_fields(fetch_additional_costly_fields, issue_handle, new_reco
     if not fetch_additional_costly_fields:
         return
     pull_request = issue_handle.as_pull_request()._rawData
-    _enrich_with_column_values(pull_request, new_record, ["merged", "requested_reviewers", "requested_teams"])
+    _enrich_with_column_values(pull_request, new_record, ["merged", "requested_reviewers", "requested_teams", "merged_at"])
     new_record["comments"] = pull_request["comments"] + pull_request["review_comments"]
 
 

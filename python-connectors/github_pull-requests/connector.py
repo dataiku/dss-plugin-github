@@ -7,7 +7,7 @@ from utils import get_github_client
 class GithubPullRequestsConnector(Connector):
 
     def __init__(self, config, plugin_config):
-        Connector.__init__(self, config, plugin_config)  # pass the parameters to the base class
+        super().__init__(config, plugin_config)  # pass the parameters to the base class
 
         self.github_client = get_github_client(config)
         self.pr_repository_full_names = config["repositories"]
@@ -34,7 +34,7 @@ class GithubPullRequestsConnector(Connector):
 
         current_number_of_fetched_prs = 0
         columns_to_keep = ["title", "html_url", "id", "number", "state", "created_at", "labels", "user", "milestone",
-                           "requested_reviewers", "requested_teams", "draft"]
+                           "requested_reviewers", "requested_teams", "draft", "closed_at", "merged_at"]
         for pr_repository_full_name in self.pr_repository_full_names:
 
             pull_requests_for_repository = self.fetch_pull_requests(pr_repository_full_name)

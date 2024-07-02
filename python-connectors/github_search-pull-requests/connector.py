@@ -28,7 +28,7 @@ class GithubSearchPullRequestsConnector(Connector):
         return search_query
 
     def __init__(self, config, plugin_config):
-        Connector.__init__(self, config, plugin_config)  # pass the parameters to the base class
+        super().__init__(config, plugin_config)  # pass the parameters to the base class
 
         self.github_client = get_github_client(config)
         self.owner = config["owner"]

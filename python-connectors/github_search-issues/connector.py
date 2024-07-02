@@ -6,7 +6,7 @@ from utils import get_github_client, fetch_issues
 class GithubSearchIssuesConnector(Connector):
 
     def __init__(self, config, plugin_config):
-        Connector.__init__(self, config, plugin_config)
+        super().__init__(config, plugin_config)
 
         self.github_client = get_github_client(config)
         self.search_query = config["search_query"]

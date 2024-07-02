@@ -1,4 +1,4 @@
-# Version 1.0.0 - 2022-07-29
+# Version 1.0.0 - 2024-07-02
 * Updates
     * Replace auth mechanism by a Personal access token preset
     * Python 3 support
