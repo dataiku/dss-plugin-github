@@ -1,95 +1,112 @@
 {
-    "meta" : {
-        "label": "Search GitHub Pull Requests",
-        "description": "Allows to search Pull Requests",
-        "icon": "icon-github-sign"
+  "meta": {
+    "label": "Search GitHub Pull Requests",
+    "description": "Allows to search Pull Requests",
+    "icon": "icon-github-sign"
+  },
+  "readable": true,
+  "writable": false,
+  "params": [
+    {
+      "name": "personal_access_token_credentials_preset",
+      "label": "Github Personal Access Token",
+      "description": "For more information on how to create your token: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token",
+      "type": "PRESET",
+      "parameterSetId": "personal-access-token"
     },
-    "readable": true,
-    "writable": false,
-
-    "params": [
+    {
+      "name": "owner",
+      "label": "Git owner",
+      "description": "Owner to fetch Pull Requests from (as in the full name {owner}/{repo}).",
+      "type": "STRING"
+    },
+    {
+      "name": "github_team_handles",
+      "type": "STRINGS",
+      "label": "Github team usernames",
+      "description": "Entered value can also be a single variable containing a list of user names (${var_name})",
+      "mandatory": true,
+      "canSelectForeign": false,
+      "markCreatedAsBuilt": false,
+      "allowDuplicates": true,
+      "getChoicesFromPython": false,
+      "triggerParameters": [],
+      "disableAutoReload": false,
+      "canCreateDataset": false
+    },
+    {
+      "name": "link_to_users",
+      "label": "Select the link to the users",
+      "type": "SELECT",
+      "selectChoices": [
         {
-            "name": "personal_access_token_credentials_preset",
-            "label": "Github Personal Access Token",
-            "description": "For more information on how to create your token: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token",
-            "type":"PRESET",
-            "parameterSetId": "personal-access-token"
+          "value": "open_by",
+          "label": "Open by"
         },
         {
-            "name": "owner",
-            "label": "Git owner",
-            "description": "Owner to fetch Pull Requests from (as in the full name {owner}/{repo}).",
-            "type":"STRING"
+          "value": "reviewed_by",
+          "label": "Reviewed by"
         },
         {
-            "name": "github_team_handles",
-            "type": "STRINGS",
-            "label": "Github team usernames",
-            "description": "Entered value can also be a single variable containing a list of user names (${var_name})",
-            "mandatory": true,
-            "canSelectForeign": false,
-            "markCreatedAsBuilt": false,
-            "allowDuplicates": true,
-            "getChoicesFromPython": false,
-            "triggerParameters": [],
-            "disableAutoReload": false,
-            "canCreateDataset": false
-        },
-		{
-			"name" : "link_to_users",
-            "label" : "Select the link to the users",
-			"type" : "SELECT",
-            "selectChoices": [
-                { "value": "open_by", "label": "Open by"},
-                { "value": "reviewed_by", "label": "Reviewed by"},
-                { "value": "all", "label": "All"}
-            ],
-            "defaultValue": "open_by"
-		},
-		{
-			"name" : "state",
-            "label" : "State of fetched Pull Requests",
-			"type" : "SELECT",
-            "selectChoices": [
-                { "value": "open", "label": "Open"},
-                { "value": "closed", "label": "Closed"},
-                { "value": "all", "label": "All"}
-            ],
-            "defaultValue": "open"
-		},
-		{
-			"name" : "since_date",
-            "label" : "Pull Requests created after",
-			"type" : "STRING",
-            "defaultValue": "YYYY-MM-DD",
-            "description": "Keep Pull Requests created after the selected date (YYYY-MM-DD)."
-		},
-		{
-			"name" : "time_consuming_operations",
-            "label" : "Time consuming operations (Makes downloading much slower)",
-			"type" : "SEPARATOR"
-		},
-        {
-            "name": "fetch_additional_costly_fields",
-            "label": "Fetch additional fields",
-            "description": "Add merged status, requested_reviewers and count of comments.",
-            "type":"BOOLEAN",
-            "defaultValue": false
-        },
-        {
-            "name": "enable_auto_retry",
-            "label": "Enable auto retry mechanism",
-            "description": "When enabled, will fetch again data after a failure due to hitting the rate limit.",
-            "type":"BOOLEAN",
-            "defaultValue": true
-        },
-        {
-            "name": "number_of_fetch_retry",
-            "label": "Number of retries:",
-            "description": "Allow to retry after hitting the rate limit. -1 for no retry limit, 0 to disable.",
-            "type":"INT",
-            "defaultValue": -1,
-            "visibilityCondition": "model.enable_auto_retry"
+          "value": "all",
+          "label": "All"
         }
-    ]
+      ],
+      "defaultValue": "open_by"
+    },
+    {
+      "name": "state",
+      "label": "State of fetched Pull Requests",
+      "type": "SELECT",
+      "selectChoices": [
+        {
+          "value": "open",
+          "label": "Open"
+        },
+        {
+          "value": "closed",
+          "label": "Closed"
+        },
+        {
+          "value": "all",
+          "label": "All"
+        }
+      ],
+      "defaultValue": "open"
+    },
+    {
+      "name": "since_date",
+      "label": "Pull Requests created after",
+      "type": "STRING",
+      "defaultValue": "YYYY-MM-DD",
+      "description": "Keep Pull Requests created after the selected date (YYYY-MM-DD)."
+    },
+    {
+      "name": "time_consuming_operations",
+      "label": "Time consuming operations (Makes downloading much slower)",
+      "type": "SEPARATOR"
+    },
+    {
+      "name": "fetch_additional_costly_fields",
+      "label": "Fetch additional fields",
+      "description": "Add merged status, requested_reviewers and count of comments.",
+      "type": "BOOLEAN",
+      "defaultValue": false
+    },
+    {
+      "name": "enable_auto_retry",
+      "label": "Enable auto retry mechanism",
+      "description": "When enabled, will fetch again data after a failure due to hitting the rate limit.",
+      "type": "BOOLEAN",
+      "defaultValue": true
+    },
+    {
+      "name": "number_of_fetch_retry",
+      "label": "Number of retries:",
+      "description": "Allow to retry after hitting the rate limit. -1 for no retry limit, 0 to disable.",
+      "type": "INT",
+      "defaultValue": -1,
+      "visibilityCondition": "model.enable_auto_retry"
+    }
+  ]
 }

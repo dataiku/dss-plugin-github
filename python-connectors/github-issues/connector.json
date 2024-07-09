@@ -1,42 +1,51 @@
 {
-	"meta" : {
-		"label" : "Github issues",
-		"description" : "Fetches the issues for a single Github repository",
-        "icon": "icon-github"
-	},
-	"strictSchema" : true,
-	"params" : [
+  "meta": {
+    "label": "Github issues",
+    "description": "Fetches the issues for a single Github repository",
+    "icon": "icon-github"
+  },
+  "strictSchema": true,
+  "params": [
+    {
+      "name": "personal_access_token_credentials_preset",
+      "label": "Github Personal Access Token",
+      "description": "For more information on how to create your token: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token",
+      "type": "PRESET",
+      "parameterSetId": "personal-access-token"
+    },
+    {
+      "name": "repos",
+      "label": "Repository (in the form user/repos)",
+      "type": "STRING",
+      "mandatory": true
+    },
+    {
+      "name": "state",
+      "label": "State of fetched issues",
+      "type": "SELECT",
+      "selectChoices": [
         {
-            "name": "personal_access_token_credentials_preset",
-            "label": "Github Personal Access Token",
-            "description": "For more information on how to create your token: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token",
-            "type":"PRESET",
-            "parameterSetId": "personal-access-token"
+          "value": "open",
+          "label": "Open"
         },
-		{
-			"name" : "repos",
-            "label" : "Repository (in the form user/repos)",
-			"type" : "STRING",
-			"mandatory" : true
-		},
-		{
-			"name" : "state",
-            "label" : "State of fetched issues",
-			"type" : "SELECT",
-            "selectChoices": [
-                { "value": "open", "label": "Open"},
-                { "value": "closed", "label": "Closed"},
-                { "value": "all", "label": "All"}
-            ],
-            "defaultValue": "all"
-		},
-		{
-			"name" : "fetch_comments",
-			"label" : "Fetch comment bodies",
-			"type" : "BOOLEAN",
-			"mandatory" : true,
-			"defaultValue": false,
-			"description":"(Makes downloading 10x slower and prone to hit rate limit)"
-		}
-	]
+        {
+          "value": "closed",
+          "label": "Closed"
+        },
+        {
+          "value": "all",
+          "label": "All"
+        }
+      ],
+      "defaultValue": "all"
+    },
+    {
+      "name": "fetch_comments",
+      "label": "Fetch comment bodies",
+      "type": "BOOLEAN",
+      "mandatory": true,
+      "defaultValue": false,
+      "description": "(Makes downloading 10x slower and prone to hit rate limit)"
+    }
+  ]
 }
