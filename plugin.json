@@ -1,6 +1,6 @@
 {
     "id": "github",
-    "version": "0.0.5",
+    "version": "1.0.0",
     "meta": {
         "label": "Github",
         "description": "Retrieve data about Github repositories",
@@ -8,6 +8,7 @@
         "icon": "icon-github",
         "tags": ["Connector"],
         "url": "https://www.dataiku.com/product/plugins/github/",
-        "licenseInfo": "Apache Software License"
+        "licenseInfo" : "Apache Software License version 2",
+        "supportLevel": "NOT_SUPPORTED"
     }
 }

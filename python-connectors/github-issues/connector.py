@@ -1,29 +1,32 @@
-import github, json, datetime, itertools, logging, json, pytz
+import json, datetime, logging, json, pytz
 from dataiku.connector import Connector
+from utils import get_github_client
+
 COLUMNS= [
-        ("number", "int"),
-        ("title", "string"),
-        ("nb_comments", "int"),
-        ("state", "string"),
-        ("assignee", "string"),
-        ("created_at", "date"),
-        ("updated_at", "date"),
-        ("closed_at", "date"),
-        ("user", "string"),
-        ("labels", "string"),
-        ("milestone", "string"), #, "query_date"
-        ("body", "string"),
-    ]
+    ("number", "int"),
+    ("title", "string"),
+    ("nb_comments", "int"),
+    ("state", "string"),
+    ("assignee", "string"),
+    ("created_at", "date"),
+    ("updated_at", "date"),
+    ("closed_at", "date"),
+    ("user", "string"),
+    ("labels", "string"),
+    ("milestone", "string"), #, "query_date"
+    ("body", "string"),
+]
+
 
 class GithubIssuesConnector(Connector):
-    def __init__(self, config):
-        Connector.__init__(self, config)
-        gh = github.Github(config["login"], config["password"])
+    def __init__(self, config, plugin_config):
+        super().__init__(config, plugin_config)
+        access_token = config["personal_access_token_credentials_preset"]["personal_access_token_credentials_parameter_set"]
+        gh = get_github_client(config)
         self.repos = gh.get_repo(config["repos"])
 
-
     def get_read_schema(self):
-        result = { "columns" : map(lambda x : {"name" : x[0], "type" : x[1]}, COLUMNS) }
+        result = { "columns" : [{"name" : x[0], "type" : x[1]} for x in COLUMNS]}
         if self.config.get('fetch_comments', False):
             result['columns'].append({
                 'name':'comments_bodies',
@@ -32,7 +35,7 @@ class GithubIssuesConnector(Connector):
         return result
 
     def generate_rows(self, dataset_schema=None, dataset_partitioning=None,
-                            partition_id=None, records_limit = -1):
+                      partition_id=None, records_limit = -1):
 
         # This connector cannot have a different schema than its fixed one
         if dataset_schema is not None:
@@ -44,11 +47,11 @@ class GithubIssuesConnector(Connector):
 
         nb = 0
 
-        for issue in itertools.chain(self.repos.get_issues(), self.repos.get_issues(state="closed")):
+        for issue in self.repos.get_issues(state=self.config.get('state', 'all')):
             issue = self.get_issue(issue)
             issue["query_date"] = str(query_date)
 
-            if records_limit >= 0 and nb >= records_limit:
+            if 0 <= records_limit <= nb:
                 return
             yield issue
             nb += 1
@@ -57,12 +60,8 @@ class GithubIssuesConnector(Connector):
                 logging.info("Read %s issues" % nb)
 
     def get_issue(self,issue):
-        ret = {}
-        ret["number"] = issue.number
-        ret["title"] = issue.title
-        ret["body"] = issue.body
-        ret["nb_comments"] = issue.comments
-        ret["state"] = issue.state
+        ret= {"number": issue.number, "title": issue.title, "body": issue.body, "nb_comments": issue.comments,
+              "state": issue.state}
         if issue.assignee is not None:
             ret["assignee"] = issue.assignee.login
 
@@ -74,15 +73,15 @@ class GithubIssuesConnector(Connector):
 
         ret["created_at"] = astz(issue.created_at)
         ret["updated_at"] = astz(issue.updated_at)
-        ret["closed_at"]  = astz(issue.closed_at)
-        ret["user"] = (issue.user.login)
+        ret["closed_at"] = astz(issue.closed_at)
+        ret["user"] = issue.user.login
         lbls = []
         for label in issue.labels:
             lbls.append(label.name)
         ret["labels"] = json.dumps(lbls)
         milestone = issue.milestone
         if milestone is not None:
-            ret["milestone"] = (issue.milestone.title)
+            ret["milestone"] = issue.milestone.title
         if self.config.get('fetch_comments', False):
             comments_bodies =  []
             if issue.comments > 0:
