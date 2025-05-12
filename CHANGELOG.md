@@ -1,3 +1,7 @@
+# Version 1.0.1 - 2025-05-13
+* Fix check of unicity that was not working in case of retry due to rate limit.
+* Freeze version of PyGithub due to breaking chances on more recent versions around rate limit.
+
 # Version 1.0.0 - 2024-07-02
 * Updates
     * Replace auth mechanism by a Personal access token preset
