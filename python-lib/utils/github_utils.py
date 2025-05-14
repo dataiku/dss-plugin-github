@@ -18,6 +18,7 @@ def fetch_issues(query_date, github_client, search_query, records_limit,
                  link_to_users=None, user_handle=None, unique_issues_ids=[], current_attempt=1):
     current_number_of_fetched_issues = len(unique_issues_ids)
     results = []
+    new_unique_issues_ids = []
     try:
         logging.info(
             "Fetching Issues corresponding to search query '{}' {}".format(
@@ -30,7 +31,7 @@ def fetch_issues(query_date, github_client, search_query, records_limit,
                 logging.info("Limit of {} reached.".format(records_limit))
                 break
             new_record = _build_base_issue_record(issue, query_date)
-            issue_already_processed = _handle_user_link(new_record, user_handle, link_to_users, unique_issues_ids)
+            issue_already_processed = _handle_user_link(new_record, user_handle, link_to_users, unique_issues_ids, new_unique_issues_ids)
             if issue_already_processed:
                 continue
             _handle_costly_fields(fetch_additional_costly_fields, issue, new_record)
@@ -38,8 +39,8 @@ def fetch_issues(query_date, github_client, search_query, records_limit,
             current_number_of_fetched_issues += 1
     except (GithubException, RateLimitExceededException) as rate_limit_exceeded_exception:
         if isinstance(rate_limit_exceeded_exception, GithubException) and not \
-                        (rate_limit_exceeded_exception.status == 403 and
-                         "rate limit" in rate_limit_exceeded_exception.data.get('message', '')):
+                (rate_limit_exceeded_exception.status == 403 and
+                 "rate limit" in rate_limit_exceeded_exception.data.get('message', '')):
             _raise_unexpected_exception(rate_limit_exceeded_exception)
         sleep_or_throw_because_of_rate_limit(
             enable_auto_retry, number_of_fetch_retry, current_attempt, github_client, rate_limit_exceeded_exception
@@ -50,6 +51,7 @@ def fetch_issues(query_date, github_client, search_query, records_limit,
                             link_to_users, user_handle, unique_issues_ids, current_attempt + 1)
     except Exception as err:
         _raise_unexpected_exception(err)
+    unique_issues_ids += new_unique_issues_ids
     return results
 
 
@@ -86,7 +88,7 @@ def _handle_costly_fields(fetch_additional_costly_fields, issue_handle, new_reco
     new_record["comments"] = pull_request["comments"] + pull_request["review_comments"]
 
 
-def _handle_user_link(new_record, user_handle, link_to_user, unique_issues_ids):
+def _handle_user_link(new_record, user_handle, link_to_user, unique_issues_ids, new_unique_issues_ids):
     if user_handle is None:
         return False
 
@@ -98,7 +100,7 @@ def _handle_user_link(new_record, user_handle, link_to_user, unique_issues_ids):
         logging.info("Already processed issue '{}'.".format(unique_id))
         return True
 
-    unique_issues_ids.append(unique_id)
+    new_unique_issues_ids.append(unique_id)
     new_record["user_handle"] = user_handle
     new_record["link_to_user"] = link_to_user
     return False
