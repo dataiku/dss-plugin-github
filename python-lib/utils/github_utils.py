@@ -27,7 +27,7 @@ def fetch_issues(query_date, github_client, search_query, records_limit,
         )
         searched_issues = github_client.search_issues(query=search_query)
         for issue in searched_issues:
-            if records_limit is not -1 and 0 <= records_limit <= current_number_of_fetched_issues:
+            if records_limit != -1 and 0 <= records_limit <= current_number_of_fetched_issues:
                 logging.info("Limit of {} reached.".format(records_limit))
                 break
             new_record = _build_base_issue_record(issue, query_date)
@@ -37,13 +37,11 @@ def fetch_issues(query_date, github_client, search_query, records_limit,
             _handle_costly_fields(fetch_additional_costly_fields, issue, new_record)
             results.append(new_record)
             current_number_of_fetched_issues += 1
-    except (GithubException, RateLimitExceededException) as rate_limit_exceeded_exception:
-        if isinstance(rate_limit_exceeded_exception, GithubException) and not \
-                (rate_limit_exceeded_exception.status == 403 and
-                 "rate limit" in rate_limit_exceeded_exception.data.get('message', '')):
-            _raise_unexpected_exception(rate_limit_exceeded_exception)
-        sleep_or_throw_because_of_rate_limit(
-            enable_auto_retry, number_of_fetch_retry, current_attempt, github_client, rate_limit_exceeded_exception
+    except (GithubException, RateLimitExceededException) as fetch_exception:
+        if not _is_retryable_fetch_exception(fetch_exception):
+            _raise_unexpected_exception(fetch_exception)
+        sleep_or_throw_because_of_retryable_fetch_failure(
+            enable_auto_retry, number_of_fetch_retry, current_attempt, github_client, fetch_exception
         )
         return fetch_issues(query_date, github_client, search_query, records_limit,
                             enable_auto_retry, number_of_fetch_retry,
@@ -55,29 +53,76 @@ def fetch_issues(query_date, github_client, search_query, records_limit,
     return results
 
 
-def sleep_or_throw_because_of_rate_limit(enable_auto_retry, number_of_fetch_retry, current_attempt, github_client,
-                                         rate_limit_exceeded_exception):
-    logging.error(rate_limit_exceeded_exception)
+def sleep_or_throw_because_of_retryable_fetch_failure(enable_auto_retry, number_of_fetch_retry, current_attempt,
+                                                      github_client, fetch_exception):
+    logging.error(fetch_exception)
     now = datetime.utcnow()
-    search_rate_limit = github_client.get_rate_limit().search
     retry_log = _build_retry_log(current_attempt, enable_auto_retry, number_of_fetch_retry)
-    logging.info("Data only partially fetched. Rate limits: {}. Current time: {} {}".format(
-        _to_rate_limit_dict(search_rate_limit), now, retry_log
-    ))
-    infinite_retry = enable_auto_retry and number_of_fetch_retry is -1
-    disable_auto_retry = not enable_auto_retry or number_of_fetch_retry is 0
+    retry_reason = _get_retry_reason(fetch_exception)
+    status_code = getattr(fetch_exception, "status", "n/a")
+    if retry_reason == "rate limit":
+        search_rate_limit = github_client.get_rate_limit().search
+        logging.info("Data only partially fetched. Retry reason: {}. Status code: {}. Rate limits: {}. Current time: {} {}".format(
+            retry_reason, status_code, _to_rate_limit_dict(search_rate_limit), now, retry_log
+        ))
+    else:
+        logging.info("Data only partially fetched. Retry reason: {}. Status code: {}. Current time: {} {}".format(
+            retry_reason, status_code, now, retry_log
+        ))
+    infinite_retry = enable_auto_retry and number_of_fetch_retry == -1
+    disable_auto_retry = not enable_auto_retry or number_of_fetch_retry == 0
     if disable_auto_retry or (not infinite_retry and current_attempt >= number_of_fetch_retry):
-        logging.info("Could not fetch result due to rate limits even after {}.".format(retry_log))
-        raise rate_limit_exceeded_exception
+        logging.info("Could not fetch result due to {} (status {}) even after {}.".format(
+            retry_reason, status_code, retry_log
+        ))
+        raise fetch_exception
 
-    seconds_before_reset = (search_rate_limit.reset - now).total_seconds() + 5
-    logging.info("Sleeping {} seconds before next attempt to fetch data.".format(seconds_before_reset))
+    if retry_reason == "rate limit":
+        seconds_before_reset = (search_rate_limit.reset - now).total_seconds() + 5
+    else:
+        # A 502/503/504 from GitHub search is a transient upstream failure. Retrying is safe because
+        # the connector is read-only and the existing retry controls still bound the behavior.
+        seconds_before_reset = 5
+    logging.info("Sleeping {} seconds before next attempt to fetch data after {} (status {}).".format(
+        seconds_before_reset, retry_reason, status_code
+    ))
     time.sleep(seconds_before_reset)
 
 
 def _build_retry_log(attempt_number, retry_boolean, max_retry):
     return "(attempt {attempt_number}, auto retry {retry_boolean}, max number of retry {max_retry})".format(
         attempt_number=attempt_number, retry_boolean=retry_boolean, max_retry=max_retry)
+
+
+def _is_retryable_fetch_exception(fetch_exception):
+    return _is_rate_limit_exception(fetch_exception) or _is_transient_server_failure(fetch_exception)
+
+
+def _get_retry_reason(fetch_exception):
+    if _is_rate_limit_exception(fetch_exception):
+        return "rate limit"
+    return "transient 5xx"
+
+
+def _is_rate_limit_exception(fetch_exception):
+    return isinstance(fetch_exception, RateLimitExceededException) or (
+        isinstance(fetch_exception, GithubException) and
+        fetch_exception.status == 403 and
+        "rate limit" in _get_github_exception_message(fetch_exception)
+    )
+
+
+def _is_transient_server_failure(fetch_exception):
+    return isinstance(fetch_exception, GithubException) and fetch_exception.status in [502, 503, 504]
+
+
+def _get_github_exception_message(fetch_exception):
+    if not isinstance(fetch_exception, GithubException):
+        return ""
+    data = getattr(fetch_exception, "data", {})
+    if isinstance(data, dict):
+        return data.get("message", "").lower()
+    return ""
 
 
 def _handle_costly_fields(fetch_additional_costly_fields, issue_handle, new_record):
