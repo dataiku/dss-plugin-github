@@ -131,6 +131,7 @@ def _handle_costly_fields(fetch_additional_costly_fields, issue_handle, new_reco
     pull_request = issue_handle.as_pull_request()._rawData
     _enrich_with_column_values(pull_request, new_record, ["merged", "requested_reviewers", "requested_teams", "merged_at"])
     new_record["comments"] = pull_request["comments"] + pull_request["review_comments"]
+    _enrich_with_column_values(pull_request, new_record, ["target_branch:base.ref", "source_branch:head.ref"])
 
 
 def _handle_user_link(new_record, user_handle, link_to_user, unique_issues_ids, new_unique_issues_ids):
@@ -181,7 +182,15 @@ def _build_base_issue_record(raw_issue, query_date):
 
 def _enrich_with_column_values(record_raw_data, record_to_enrich, column_names):
     for column_name in column_names:
-        record_to_enrich[column_name] = record_raw_data[column_name]
+        if ":" in column_name:
+            column_label, column_path = column_name.split(":", 1)
+        else:
+            column_label = column_path = column_name
+
+        column_value = record_raw_data
+        for column_part in column_path.split("."):
+            column_value = column_value.get(column_part, {})
+        record_to_enrich[column_label] = column_value
 
 
 def _raise_unexpected_exception(unexpected_exception):

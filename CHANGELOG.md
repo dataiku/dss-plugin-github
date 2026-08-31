@@ -3,6 +3,7 @@
     * Add a `closed_before_date` parameter to restrict closed pull requests by closing date.
     * Allow `since_date` and `closed_before_date` to use DSS variables in addition to literal `YYYY-MM-DD` values.
     * Validate resolved date values after variable expansion and improve date-related error messages.
+    * Include pull-request source and target branch names in fetched records.
 * Reliability
     * Retry transient GitHub search failures for HTTP `502`, `503`, and `504` in addition to rate-limit retries.
     * Keep upstream HTTP status codes visible in retry logs to make runtime failures easier to diagnose.
