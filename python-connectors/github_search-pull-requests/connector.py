@@ -1,3 +1,4 @@
+import dataiku
 from dataiku.connector import Connector
 import logging
 from utils import get_github_client, fetch_issues
@@ -10,22 +11,48 @@ class GithubSearchPullRequestsConnector(Connector):
 
     @staticmethod
     def resolve_github_team_handles(github_team_handles):
-        if len(github_team_handles) is 1 and re.fullmatch(r'\[.*\]', github_team_handles[0]) is not None:
+        if len(github_team_handles) == 1 and re.fullmatch(r'\[.*\]', github_team_handles[0]) is not None:
             # Variable containing list of users
             return json.loads(github_team_handles[0])
         return github_team_handles
 
     @staticmethod
-    def build_search_query(link_to_users, user_handle, owner, state, since_date):
-        search_query = "{link_to_users}:{user_handle} user:{owner} is:pr created:>{since_date}".format(
-            link_to_users=link_to_users,
-            user_handle=user_handle,
-            owner=owner,
-            since_date=since_date
-        )
+    def resolve_and_parse_date_parameter(date_value, field_name, required):
+        normalized_value = (date_value or "").strip()
+
+        if not normalized_value:
+            if required:
+                raise ValueError("{} is mandatory and must be in YYYY-MM-DD format or a variable like ${{var_name}}".format(field_name))
+            return ""
+
+        resolved_value = normalized_value
+        variable_match = re.fullmatch(r"\$\{([^}]+)\}", normalized_value)
+        if variable_match is not None:
+            variable_name = variable_match.group(1)
+            resolved_value = dataiku.get_custom_variables().get(variable_name, "").strip()
+            if not resolved_value:
+                if required:
+                    raise ValueError("{} variable '{}' is empty or undefined".format(field_name, variable_name))
+                return ""
+
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", resolved_value) is None:
+            raise ValueError("{} must resolve to a YYYY-MM-DD date, got '{}'".format(field_name, resolved_value))
+
+        return resolved_value
+
+    @staticmethod
+    def build_search_query(link_to_users, user_handle, owner, state, since_date, closed_before_date):
+        query_parts = [
+            "{}:{}".format(link_to_users, user_handle),
+            "user:{}".format(owner),
+            "is:pr",
+            "created:>{}".format(since_date)
+        ]
         if state in ["open", "closed"]:
-            return "{} state:{}".format(search_query, state)
-        return search_query
+            query_parts.append("state:{}".format(state))
+        if closed_before_date and state == "closed":
+            query_parts.append("closed:<{}".format(closed_before_date))
+        return " ".join(query_parts)
 
     def __init__(self, config, plugin_config):
         super().__init__(config, plugin_config)  # pass the parameters to the base class
@@ -35,7 +62,10 @@ class GithubSearchPullRequestsConnector(Connector):
         self.github_team_handles = self.resolve_github_team_handles(config["github_team_handles"])
         self.link_to_users = config["link_to_users"]
         self.state = config["state"]
-        self.since_date = config["since_date"]
+        self.since_date = self.resolve_and_parse_date_parameter(config.get("since_date"), "since_date", required=True)
+        self.closed_before_date = self.resolve_and_parse_date_parameter(
+            config.get("closed_before_date"), "closed_before_date", required=False
+        )
         self.fetch_additional_costly_fields = config["fetch_additional_costly_fields"]
         self.enable_auto_retry = config["enable_auto_retry"]
         self.number_of_fetch_retry = config["number_of_fetch_retry"]
@@ -54,9 +84,9 @@ class GithubSearchPullRequestsConnector(Connector):
             fetched_issues = \
                 self.fetch_issues_for_users("author", records_limit, remaining_records_to_fetch, query_date)
 
-        can_add_new_records = records_limit is -1 or len(self.fetched_issues_unique_ids) < records_limit
+        can_add_new_records = records_limit == -1 or len(self.fetched_issues_unique_ids) < records_limit
         if can_add_new_records and self.link_to_users in ["all", "reviewed_by"]:
-            if records_limit is not -1:
+            if records_limit != -1:
                 remaining_records_to_fetch -= len(self.fetched_issues_unique_ids)
             fetched_issues += \
                 self.fetch_issues_for_users("reviewed-by", records_limit, remaining_records_to_fetch, query_date)
@@ -72,7 +102,7 @@ class GithubSearchPullRequestsConnector(Connector):
             )
             result += new_issues
 
-            if records_limit is not -1:
+            if records_limit != -1:
                 remaining_records_to_fetch -= len(new_issues)
                 if remaining_records_to_fetch <= 0:
                     logging.info("Max number of record reached ({}). Stop fetching.".format(records_limit))
@@ -81,7 +111,9 @@ class GithubSearchPullRequestsConnector(Connector):
         return result
 
     def fetch_issues_for_link_to_users(self, query_date, link_to_users, user_handle, remaining_records_to_fetch, records_limit):
-        search_query = self.build_search_query(link_to_users, user_handle, self.owner, self.state, self.since_date)
+        search_query = self.build_search_query(
+            link_to_users, user_handle, self.owner, self.state, self.since_date, self.closed_before_date
+        )
         logging.info(
             "Fetching Issues corresponding to search query '{}' (remaining records to fetch: {}, already fetched items: {})".format(
                 search_query, remaining_records_to_fetch, len(self.fetched_issues_unique_ids)

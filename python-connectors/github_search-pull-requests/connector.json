@@ -79,7 +79,15 @@
       "label": "Pull Requests created after",
       "type": "STRING",
       "defaultValue": "YYYY-MM-DD",
-      "description": "Keep Pull Requests created after the selected date (YYYY-MM-DD)."
+      "description": "Keep Pull Requests created after the selected date (YYYY-MM-DD). You can also enter a variable such as ${var_name}."
+    },
+    {
+      "name": "closed_before_date",
+      "label": "Pull Requests closed before",
+      "type": "STRING",
+      "defaultValue": "",
+      "description": "Optional. When state is Closed, keep only Pull Requests closed before the selected date (YYYY-MM-DD). Leave empty to keep all closed Pull Requests regardless of closing date. You can also enter a variable such as ${var_name}.",
+      "visibilityCondition": "model.state == 'closed'"
     },
     {
       "name": "time_consuming_operations",
@@ -89,7 +97,7 @@
     {
       "name": "fetch_additional_costly_fields",
       "label": "Fetch additional fields",
-      "description": "Add merged status, requested_reviewers and count of comments.",
+      "description": "Add merged status, requested_reviewers, count of comments and branches information.",
       "type": "BOOLEAN",
       "defaultValue": false
     },

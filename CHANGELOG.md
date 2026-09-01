@@ -1,3 +1,15 @@
+# Version 1.1.0 - 2026-04-03
+* Search GitHub Pull Requests
+    * Add a `closed_before_date` parameter to restrict closed pull requests by closing date.
+    * Allow `since_date` and `closed_before_date` to use DSS variables in addition to literal `YYYY-MM-DD` values.
+    * Validate resolved date values after variable expansion and improve date-related error messages.
+    * Include pull-request source and target branch names in fetched records.
+* Reliability
+    * Retry transient GitHub search failures for HTTP `502`, `503`, and `504` in addition to rate-limit retries.
+    * Keep upstream HTTP status codes visible in retry logs to make runtime failures easier to diagnose.
+* Internal cleanup
+    * Fix incorrect integer identity comparisons in the updated GitHub search pull request code paths.
+
 # Version 1.0.1 - 2025-05-13
 * Fix check of unicity that was not working in case of retry due to rate limit.
 * Freeze version of PyGithub due to breaking chances on more recent versions around rate limit.
