@@ -97,7 +97,7 @@
     {
       "name": "fetch_additional_costly_fields",
       "label": "Fetch additional fields",
-      "description": "Add merged status, requested_reviewers, count of comments and branch information.",
+      "description": "Add merged status, requested_reviewers, count of comments and branches information.",
       "type": "BOOLEAN",
       "defaultValue": false
     },

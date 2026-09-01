@@ -131,7 +131,7 @@ def _handle_costly_fields(fetch_additional_costly_fields, issue_handle, new_reco
     pull_request = issue_handle.as_pull_request()._rawData
     _enrich_with_column_values(pull_request, new_record, ["merged", "requested_reviewers", "requested_teams", "merged_at"])
     new_record["comments"] = pull_request["comments"] + pull_request["review_comments"]
-    _enrich_with_column_values(pull_request, new_record, ["target_branch:base.ref", "source_branch:head.ref"])
+    _enrich_with_column_values(pull_request, new_record, ["base_branch:base.ref", "head_branch:head.ref"])
 
 
 def _handle_user_link(new_record, user_handle, link_to_user, unique_issues_ids, new_unique_issues_ids):
