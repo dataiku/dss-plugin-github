@@ -1,3 +1,8 @@
+## Version 1.1.0 - Enhancement release - 2026-10-09
+
+- Added supported Python versions: 3.12, 3.13, 3.14
+- Makefile cleanup: release_info.json lines removed
+
 # Version 1.0.1 - 2025-05-13
 * Fix check of unicity that was not working in case of retry due to rate limit.
 * Freeze version of PyGithub due to breaking chances on more recent versions around rate limit.
