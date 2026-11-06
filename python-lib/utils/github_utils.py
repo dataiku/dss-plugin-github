@@ -2,9 +2,15 @@ import github
 from github import RateLimitExceededException, GithubException
 import logging
 import time
-from datetime import datetime
+from email.utils import parsedate_to_datetime
+import math
 
-MAX_NUMBER_OF_FETCH_ATTEMPT_TO_BYPASS_RATE_LIMIT = 2
+MAX_NUMBER_OF_FETCH_ATTEMPT_TO_BYPASS_RATE_LIMIT = 10
+COSTLY_COMMENTS_FIELD = "comments"
+COSTLY_FIELDS = ("merged", "requested_reviewers", "requested_teams", "merged_at",
+                 COSTLY_COMMENTS_FIELD, "base_branch:base.ref", "head_branch:head.ref")
+COSTLY_FIELD_NAMES = tuple(field.split(":", 1)[0] for field in COSTLY_FIELDS)
+RATE_LIMIT_HEADERS = ("retry-after", "x-ratelimit-remaining", "x-ratelimit-reset")
 
 
 def get_github_client(config, preset_id="personal_access_token_credentials_preset"):
@@ -15,78 +21,55 @@ def get_github_client(config, preset_id="personal_access_token_credentials_prese
 def fetch_issues(query_date, github_client, search_query, records_limit,
                  enable_auto_retry=False, number_of_fetch_retry=0,
                  fetch_additional_costly_fields=False,
-                 link_to_users=None, user_handle=None, unique_issues_ids=[], current_attempt=1):
-    current_number_of_fetched_issues = len(unique_issues_ids)
-    results = []
-    new_unique_issues_ids = []
-    try:
-        logging.info(
-            "Fetching Issues corresponding to search query '{}' {}".format(
-                search_query,
-                _build_retry_log(current_attempt, enable_auto_retry, number_of_fetch_retry))
-        )
-        searched_issues = github_client.search_issues(query=search_query)
-        for issue in searched_issues:
-            if records_limit != -1 and 0 <= records_limit <= current_number_of_fetched_issues:
-                logging.info("Limit of {} reached.".format(records_limit))
-                break
-            new_record = _build_base_issue_record(issue, query_date)
-            issue_already_processed = _handle_user_link(new_record, user_handle, link_to_users, unique_issues_ids, new_unique_issues_ids)
-            if issue_already_processed:
-                continue
-            _handle_costly_fields(fetch_additional_costly_fields, issue, new_record)
-            results.append(new_record)
-            current_number_of_fetched_issues += 1
-    except (GithubException, RateLimitExceededException) as fetch_exception:
-        if not _is_retryable_fetch_exception(fetch_exception):
-            _raise_unexpected_exception(fetch_exception)
-        sleep_or_throw_because_of_retryable_fetch_failure(
-            enable_auto_retry, number_of_fetch_retry, current_attempt, github_client, fetch_exception
-        )
-        return fetch_issues(query_date, github_client, search_query, records_limit,
-                            enable_auto_retry, number_of_fetch_retry,
-                            fetch_additional_costly_fields,
-                            link_to_users, user_handle, unique_issues_ids, current_attempt + 1)
-    except Exception as err:
-        _raise_unexpected_exception(err)
-    unique_issues_ids += new_unique_issues_ids
-    return results
+                 link_to_users=None, user_handle=None, unique_issues_ids=[]):
+    max_attempts = _max_attempts(enable_auto_retry, number_of_fetch_retry)
+    secondary_failures = 0
+    for attempt in range(1, max_attempts + 1):
+        current_number_of_fetched_issues = len(unique_issues_ids)
+        results = []
+        new_unique_issues_ids = []
+        try:
+            logging.info("Fetching Issues corresponding to search query '%s' %s", search_query,
+                         _build_retry_log(attempt, enable_auto_retry, number_of_fetch_retry))
+            searched_issues = github_client.search_issues(query=search_query)
+            for issue in searched_issues:
+                if records_limit != -1 and 0 <= records_limit <= current_number_of_fetched_issues:
+                    logging.info("Limit of %s reached.", records_limit)
+                    break
+                new_record = _build_base_issue_record(issue, query_date)
+                issue_already_processed = _handle_user_link(new_record, user_handle, link_to_users,
+                                                             unique_issues_ids, new_unique_issues_ids)
+                if issue_already_processed:
+                    continue
+                _fetch_costly_fields_with_retry(fetch_additional_costly_fields, issue, new_record,
+                                                enable_auto_retry, number_of_fetch_retry)
+                results.append(new_record)
+                current_number_of_fetched_issues += 1
+        except GithubException as fetch_exception:
+            kind, headers = _classify_failure(fetch_exception)
+            if kind is None:
+                logging.exception("Unexpected GitHub search failure; propagating error")
+                raise
+            if attempt >= max_attempts:
+                logging.exception("GitHub search retries disabled or exhausted (attempt %s/%s, %s); propagating error",
+                                  attempt, max_attempts, kind)
+                raise
+            secondary_failures = secondary_failures + 1 if kind in ("secondary", "ambiguous") else 0
+            _wait_before_retry(fetch_exception, kind, headers, secondary_failures, attempt, max_attempts, "search")
+            continue
+        except Exception:
+            logging.exception("Unexpected error while fetching issues; propagating error")
+            raise
+        unique_issues_ids.extend(new_unique_issues_ids)
+        return results
 
 
-def sleep_or_throw_because_of_retryable_fetch_failure(enable_auto_retry, number_of_fetch_retry, current_attempt,
-                                                      github_client, fetch_exception):
-    logging.error(fetch_exception)
-    now = datetime.utcnow()
-    retry_log = _build_retry_log(current_attempt, enable_auto_retry, number_of_fetch_retry)
-    retry_reason = _get_retry_reason(fetch_exception)
-    status_code = getattr(fetch_exception, "status", "n/a")
-    if retry_reason == "rate limit":
-        search_rate_limit = github_client.get_rate_limit().search
-        logging.info("Data only partially fetched. Retry reason: {}. Status code: {}. Rate limits: {}. Current time: {} {}".format(
-            retry_reason, status_code, _to_rate_limit_dict(search_rate_limit), now, retry_log
-        ))
-    else:
-        logging.info("Data only partially fetched. Retry reason: {}. Status code: {}. Current time: {} {}".format(
-            retry_reason, status_code, now, retry_log
-        ))
-    infinite_retry = enable_auto_retry and number_of_fetch_retry == -1
-    disable_auto_retry = not enable_auto_retry or number_of_fetch_retry == 0
-    if disable_auto_retry or (not infinite_retry and current_attempt >= number_of_fetch_retry):
-        logging.info("Could not fetch result due to {} (status {}) even after {}.".format(
-            retry_reason, status_code, retry_log
-        ))
-        raise fetch_exception
-
-    if retry_reason == "rate limit":
-        seconds_before_reset = (search_rate_limit.reset - now).total_seconds() + 5
-    else:
-        # A 502/503/504 from GitHub search is a transient upstream failure. Retrying is safe because
-        # the connector is read-only and the existing retry controls still bound the behavior.
-        seconds_before_reset = 5
-    logging.info("Sleeping {} seconds before next attempt to fetch data after {} (status {}).".format(
-        seconds_before_reset, retry_reason, status_code
-    ))
-    time.sleep(seconds_before_reset)
+def _max_attempts(enable_auto_retry, number_of_fetch_retry):
+    if not enable_auto_retry or number_of_fetch_retry == 0:
+        return 1
+    if number_of_fetch_retry == -1:
+        return MAX_NUMBER_OF_FETCH_ATTEMPT_TO_BYPASS_RATE_LIMIT
+    return max(1, number_of_fetch_retry)
 
 
 def _build_retry_log(attempt_number, retry_boolean, max_retry):
@@ -94,44 +77,109 @@ def _build_retry_log(attempt_number, retry_boolean, max_retry):
         attempt_number=attempt_number, retry_boolean=retry_boolean, max_retry=max_retry)
 
 
-def _is_retryable_fetch_exception(fetch_exception):
-    return _is_rate_limit_exception(fetch_exception) or _is_transient_server_failure(fetch_exception)
-
-
-def _get_retry_reason(fetch_exception):
-    if _is_rate_limit_exception(fetch_exception):
-        return "rate limit"
-    return "transient 5xx"
-
-
-def _is_rate_limit_exception(fetch_exception):
-    return isinstance(fetch_exception, RateLimitExceededException) or (
-        isinstance(fetch_exception, GithubException) and
-        fetch_exception.status == 403 and
-        "rate limit" in _get_github_exception_message(fetch_exception)
-    )
-
-
-def _is_transient_server_failure(fetch_exception):
-    return isinstance(fetch_exception, GithubException) and fetch_exception.status in [502, 503, 504]
-
-
-def _get_github_exception_message(fetch_exception):
-    if not isinstance(fetch_exception, GithubException):
-        return ""
-    data = getattr(fetch_exception, "data", {})
-    if isinstance(data, dict):
-        return data.get("message", "").lower()
-    return ""
-
-
-def _handle_costly_fields(fetch_additional_costly_fields, issue_handle, new_record):
+def _fetch_costly_fields_with_retry(fetch_additional_costly_fields, issue, new_record,
+                                    enable_auto_retry, number_of_fetch_retry):
     if not fetch_additional_costly_fields:
         return
+    new_record.update({name: None for name in COSTLY_FIELD_NAMES})
+    max_attempts = _max_attempts(enable_auto_retry, number_of_fetch_retry)
+    secondary_failures = 0
+    for attempt in range(1, max_attempts + 1):
+        costly_fields = {}
+        try:
+            _handle_costly_fields(issue, costly_fields)
+            new_record.update(costly_fields)
+            return
+        except GithubException as error:
+            kind, headers = _classify_failure(error)
+            if kind not in ("primary", "secondary", "ambiguous"):
+                logging.exception("Optional fields failed with a non-rate-limit GitHub error; keeping base record")
+                return
+            if attempt >= max_attempts:
+                logging.exception("Optional-field rate-limit retries disabled or exhausted (attempt %s/%s); keeping base record",
+                                  attempt, max_attempts)
+                return
+            secondary_failures = secondary_failures + 1 if kind in ("secondary", "ambiguous") else 0
+            _wait_before_retry(error, kind, headers, secondary_failures, attempt, max_attempts, "optional fields")
+        except Exception:
+            logging.exception("Optional fields failed unexpectedly; keeping base record")
+            return
+
+
+def _classify_failure(exc):
+    raw = getattr(exc, "headers", None)
+    headers = {str(k).lower(): str(v) for k, v in raw.items() if str(k).lower() in RATE_LIMIT_HEADERS} if hasattr(raw, "items") else {}
+    data = getattr(exc, "data", None)
+    message = data.get("message", "") if isinstance(data, dict) else ""
+    message = message if isinstance(message, str) else ""
+    normalized_message = message.lower()
+    status = getattr(exc, "status", None)
+    limited = (isinstance(exc, RateLimitExceededException) or status == 429 or
+               (status == 403 and ("rate limit" in normalized_message or
+                headers.get("x-ratelimit-remaining") == "0" or "retry-after" in headers)))
+    if limited:
+        if "secondary" in normalized_message or "abuse" in normalized_message:
+            kind = "secondary"
+        else:
+            kind = "primary" if headers.get("x-ratelimit-remaining") == "0" else "ambiguous"
+    else:
+        kind = "transient" if status in (502, 503, 504) else None
+    logging.info("GitHub failure: status=%s message=%s headers=%s rate_limited=%s classification=%s",
+                 status, message, headers, limited, kind)
+    return kind, headers
+
+
+def _parse_nonnegative_header_number(value):
+    try:
+        value = float(value)
+        return value if math.isfinite(value) and value >= 0 else None
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _retry_delay(kind, headers, secondary_failures, now):
+    if kind == "transient":
+        logging.info("Transient GitHub error: retrying in 5 seconds")
+        return 5
+    retry_after = _parse_nonnegative_header_number(headers.get("retry-after"))
+    if retry_after is None and headers.get("retry-after"):
+        try:
+            parsed = parsedate_to_datetime(headers["retry-after"])
+            if parsed.tzinfo is not None:
+                retry_after = max(0, parsed.timestamp() - now)
+        except (TypeError, ValueError, OverflowError, OSError):
+            pass
+    reset = _parse_nonnegative_header_number(headers.get("x-ratelimit-reset"))
+    if retry_after is not None:
+        minimum, reason = retry_after, "Retry-After"
+    elif headers.get("x-ratelimit-remaining") == "0" and reset is not None:
+        minimum, reason = max(0, reset - now) + 5, "rate-limit reset plus five seconds"
+    else:
+        minimum, reason = 60, "fallback"
+    if kind in ("secondary", "ambiguous"):
+        backoff = 60 * 2 ** min(max(secondary_failures - 1, 0), 5)
+        delay = max(minimum, backoff)
+        logging.info("Rate-limit delay: %s=%s seconds, %s backoff=%s seconds; retrying in %s seconds",
+                     reason, minimum, kind, backoff, delay)
+        return delay
+    logging.info("Rate-limit delay: %s; retrying in %s seconds", reason, minimum)
+    return minimum
+
+
+def _wait_before_retry(error, kind, headers, secondary_failures, attempt, max_attempts, scope):
+    delay = _retry_delay(kind, headers, secondary_failures, time.time())
+    logging.warning("GitHub %s failure: status=%s classification=%s headers=%s attempt=%s/%s; sleeping %s seconds before retry",
+                    scope, getattr(error, "status", None), kind, headers, attempt, max_attempts, delay)
+    time.sleep(delay)
+
+
+def _handle_costly_fields(issue_handle, new_record):
     pull_request = issue_handle.as_pull_request()._rawData
-    _enrich_with_column_values(pull_request, new_record, ["merged", "requested_reviewers", "requested_teams", "merged_at"])
-    new_record["comments"] = pull_request["comments"] + pull_request["review_comments"]
-    _enrich_with_column_values(pull_request, new_record, ["base_branch:base.ref", "head_branch:head.ref"])
+    for field in COSTLY_FIELDS:
+        if field == COSTLY_COMMENTS_FIELD:
+            new_record[COSTLY_COMMENTS_FIELD] = pull_request["comments"] + pull_request["review_comments"]
+        else:
+            _enrich_with_column_values(pull_request, new_record, [field])
 
 
 def _handle_user_link(new_record, user_handle, link_to_user, unique_issues_ids, new_unique_issues_ids):
@@ -160,14 +208,6 @@ def _build_unique_id(issue_id, user_handle):
     return "{} linked to {}".format(issue_id, user_handle)
 
 
-def _to_rate_limit_dict(rate_limit):
-    return {
-        "limit": rate_limit.limit,
-        "remaining": rate_limit.remaining,
-        "reset": rate_limit.reset
-    }
-
-
 def _build_base_issue_record(raw_issue, query_date):
     issue_raw_data = raw_issue._rawData
     result = {"query_date": query_date}
@@ -193,6 +233,3 @@ def _enrich_with_column_values(record_raw_data, record_to_enrich, column_names):
         record_to_enrich[column_label] = column_value
 
 
-def _raise_unexpected_exception(unexpected_exception):
-    logging.error("An unexpected exception occurred while fetching issues: %s", unexpected_exception)
-    raise unexpected_exception

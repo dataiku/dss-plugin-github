@@ -111,7 +111,7 @@
     {
       "name": "number_of_fetch_retry",
       "label": "Number of retries:",
-      "description": "Allow to retry after hitting the rate limit. -1 for no retry limit, 0 to disable.",
+      "description": "Maximum total fetch attempts when auto retry is enabled. 0 disables retries; -1 allows 10 attempts.",
       "type": "INT",
       "defaultValue": -1,
       "visibilityCondition": "model.enable_auto_retry"
