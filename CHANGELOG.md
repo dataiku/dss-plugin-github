@@ -1,4 +1,4 @@
-# Unreleased
+# Version 1.2.0 - 2026-11-09
 * Retry rate limits using response headers, including HTTP 429. The -1 retry setting now allows ten total attempts.
 * Retry optional pull request fields separately from the search; skip unavailable fields after failure.
 
