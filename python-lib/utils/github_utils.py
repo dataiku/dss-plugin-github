@@ -93,16 +93,16 @@ def _fetch_costly_fields_with_retry(fetch_additional_costly_fields, issue, new_r
         except GithubException as error:
             kind, headers = _classify_failure(error)
             if kind not in ("primary", "secondary", "ambiguous"):
-                logging.exception("Optional fields failed with a non-rate-limit GitHub error; keeping base record")
+                logging.exception("Fetching of optional costly fields failed with a non-rate-limit GitHub error; keeping base record")
                 return
             if attempt >= max_attempts:
-                logging.exception("Optional-field rate-limit retries disabled or exhausted (attempt %s/%s); keeping base record",
+                logging.exception("Fetching  of Optional costly fields rate-limit retries disabled or exhausted (attempt %s/%s); keeping base record",
                                   attempt, max_attempts)
                 return
             secondary_failures = secondary_failures + 1 if kind in ("secondary", "ambiguous") else 0
             _wait_before_retry(error, kind, headers, secondary_failures, attempt, max_attempts, "optional fields")
         except Exception:
-            logging.exception("Optional fields failed unexpectedly; keeping base record")
+            logging.exception("Fetching of Optional costly fields failed unexpectedly; keeping base record")
             return
 
 
