@@ -100,7 +100,7 @@ def _fetch_costly_fields_with_retry(fetch_additional_costly_fields, issue, new_r
                                   attempt, max_attempts)
                 return
             secondary_failures = secondary_failures + 1 if kind in ("secondary", "ambiguous") else 0
-            _wait_before_retry(error, kind, headers, secondary_failures, attempt, max_attempts, "optional fields")
+            _wait_before_retry(error, kind, headers, secondary_failures, attempt, max_attempts, "optional costly fields")
         except Exception:
             logging.exception("Fetching of Optional costly fields failed unexpectedly; keeping base record")
             return
