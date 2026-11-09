@@ -1,3 +1,7 @@
+# Version 1.2.0 - 2026-11-09
+* Retry rate limits using response headers, including HTTP 429. The -1 retry setting now allows ten total attempts.
+* Retry optional pull request fields separately from the search; skip unavailable fields after failure.
+
 # Version 1.1.0 - 2026-04-03
 * Search GitHub Pull Requests
     * Add a `closed_before_date` parameter to restrict closed pull requests by closing date.
